@@ -1,7 +1,7 @@
 /**
  * Platform name used in Homebridge config.json.
  */
-export const PLATFORM_NAME = 'RoombaPro';
+export const PLATFORM_NAME = 'Roomba';
 
 /**
  * Plugin package name.
