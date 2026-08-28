@@ -37,6 +37,7 @@
     "watch": "npm run build && npm link && nodemon"
   },
   "dependencies": {
+    "dorita980": "^4.0.0",
     "homebridge-lib": "^8.1.4"
   },
   "devDependencies": {
