@@ -6,7 +6,9 @@
   "schema": {
     "type": "object",
     "required": [
-      "name"
+      "name",
+      "email",
+      "password"
     ],
     "additionalProperties": false,
     "properties": {
@@ -14,18 +16,43 @@
         "title": "Name",
         "type": "string",
         "default": "Roomba"
+      },
+      "email": {
+        "title": "iRobot Account Email",
+        "type": "string",
+        "description": "The email address used to sign in to the iRobot / Roomba Home app.",
+        "x-schema-form": {
+          "type": "email"
+        }
+      },
+      "password": {
+        "title": "iRobot Account Password",
+        "type": "string",
+        "description": "The password used to sign in to the iRobot / Roomba Home app.",
+        "x-schema-form": {
+          "type": "password"
+        }
+      },
+      "countryCode": {
+        "title": "Country Code",
+        "type": "string",
+        "default": "CA",
+        "description": "Two-letter country code used for iRobot service discovery."
       }
     }
   },
   "layout": [
     {
       "type": "fieldset",
-      "title": "Roomba",
-      "description": "Connect your supported iRobot Roomba robot vacuum to Homebridge.",
+      "title": "Roomba Pro",
+      "description": "Connect your supported iRobot Roomba to Homebridge.",
       "expandable": true,
       "expanded": true,
       "items": [
-        "name"
+        "name",
+        "email",
+        "password",
+        "countryCode"
       ]
     }
   ]
