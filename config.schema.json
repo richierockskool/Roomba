@@ -1,18 +1,32 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "Roomba",
   "pluginType": "platform",
   "singular": true,
-  "strictValidation": false,
+  "strictValidation": true,
   "schema": {
     "type": "object",
-    "required": ["name"],
+    "required": [
+      "name"
+    ],
     "additionalProperties": false,
     "properties": {
       "name": {
         "title": "Name",
         "type": "string",
-        "default": "Example Dynamic Platform"
+        "default": "Roomba"
       }
     }
-  }
+  },
+  "layout": [
+    {
+      "type": "fieldset",
+      "title": "Roomba",
+      "description": "Connect your supported iRobot Roomba robot vacuum to Homebridge.",
+      "expandable": true,
+      "expanded": true,
+      "items": [
+        "name"
+      ]
+    }
+  ]
 }
