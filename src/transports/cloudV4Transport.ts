@@ -6,14 +6,14 @@ import type {
   RoombaTransportStateListener,
 } from './roombaTransport.js';
 
+import {
+  V4Authentication,
+  type V4Credentials,
+  type V4Session,
+} from './v4Authentication.js';
+
 /**
- * CloudV4Transport
- *
- * Communication transport for newer V4 / Prime-generation
- * iRobot Roombas.
- *
- * Authentication and AWS IoT communication will be added
- * in the next patch after configuration is established.
+ * Cloud transport for newer V4-generation iRobot robots.
  */
 export class CloudV4Transport implements RoombaTransport {
 
@@ -29,11 +29,21 @@ export class CloudV4Transport implements RoombaTransport {
   private readonly listeners =
     new Set<RoombaTransportStateListener>();
 
+  private readonly authentication: V4Authentication;
+
+  private session?: V4Session;
   private connected = false;
 
   constructor(
     private readonly log: Logging,
+    credentials: V4Credentials,
   ) {
+
+    this.authentication =
+      new V4Authentication(
+        this.log,
+        credentials,
+      );
   }
 
   public async connect(): Promise<void> {
@@ -43,24 +53,33 @@ export class CloudV4Transport implements RoombaTransport {
     }
 
     this.log.info(
-      'Cloud V4 transport initializing...',
+      'Connecting iRobot Cloud V4 transport...',
     );
 
-    /*
-     * Real authentication will be added next:
-     *
-     * 1. iRobot endpoint discovery
-     * 2. Gigya authentication
-     * 3. iRobot /v2/login
-     * 4. AWS IoT MQTT connection
-     * 5. Device shadow subscription
-     */
+    this.session =
+      await this.authentication.authenticate();
+
+    const robot =
+      this.session.robots[0];
+
+    if (!robot) {
+      throw new Error(
+        'No supported Roomba was returned by the iRobot account.',
+      );
+    }
 
     this.connected = true;
 
     this.log.info(
-      'Cloud V4 transport ready for authentication.',
+      `Cloud V4 transport connected to ${robot.name} (${robot.sku}).`,
     );
+
+    /*
+     * AWS IoT MQTT connection comes next.
+     *
+     * At this checkpoint we have intentionally stopped
+     * after successful account/robot discovery.
+     */
   }
 
   public async disconnect(): Promise<void> {
@@ -70,6 +89,7 @@ export class CloudV4Transport implements RoombaTransport {
     }
 
     this.connected = false;
+    this.session = undefined;
 
     this.log.info(
       'Cloud V4 transport disconnected.',
@@ -114,53 +134,24 @@ export class CloudV4Transport implements RoombaTransport {
     );
   }
 
-  /**
-   * V4 command dispatcher.
-   *
-   * The real implementation will publish:
-   *
-   * {irbtTopics}/things/{BLID}/cmd
-   *
-   * with:
-   *
-   * {
-   *   command,
-   *   time,
-   *   initiator: 'localApp'
-   * }
-   */
   private async sendCommand(
     command: string,
   ): Promise<void> {
 
-    if (!this.connected) {
+    if (!this.connected || !this.session) {
       throw new Error(
         'Cloud V4 transport is not connected.',
       );
     }
 
-    this.log.info(
-      `Roomba V4 command requested: ${command}`,
+    /*
+     * Deliberately blocked until MQTT is installed.
+     *
+     * We do NOT pretend a command succeeded merely because
+     * HomeKit requested it.
+     */
+    throw new Error(
+      `Roomba command "${command}" is not available until the V4 MQTT connection is established.`,
     );
-  }
-
-  /**
-   * Publish normalized robot state to RoombaController.
-   */
-  private publishState(
-    changes: Partial<RoombaTransportState>,
-  ): void {
-
-    this.state = {
-      ...this.state,
-      ...changes,
-    };
-
-    const snapshot =
-      this.getState();
-
-    for (const listener of this.listeners) {
-      listener(snapshot);
-    }
   }
 }

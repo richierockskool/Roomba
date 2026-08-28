@@ -1,11 +1,17 @@
-import type { Logging } from 'homebridge';
+import type {
+  Logging,
+  PlatformConfig,
+} from 'homebridge';
 
-/**
- * Internal Roomba state.
- *
- * HomeKit should never become the source of truth for robot state.
- * RoombaController owns the state and publishes changes outward.
- */
+import {
+  CloudV4Transport,
+} from './transports/cloudV4Transport.js';
+
+import type {
+  RoombaTransport,
+  RoombaTransportState,
+} from './transports/roombaTransport.js';
+
 export interface RoombaState {
   isCleaning: boolean;
   isDocked: boolean;
@@ -17,48 +23,81 @@ type RoombaStateListener =
   (state: RoombaState) => void;
 
 /**
- * RoombaController
- *
- * Single owner of Roomba communication and state.
- *
- * During Patch #2 this is intentionally a stub.
- * Real robot communication will be added in the next phase.
+ * Single owner of Roomba communication and normalized state.
  */
 export class RoombaController {
 
   private state: RoombaState = {
     isCleaning: false,
-    isDocked: true,
+    isDocked: false,
     isCharging: false,
-    batteryLevel: 100,
+    batteryLevel: 0,
   };
 
   private readonly listeners =
     new Set<RoombaStateListener>();
 
+  private readonly transport: RoombaTransport;
+
   constructor(
     private readonly log: Logging,
+    config: PlatformConfig,
   ) {
-    this.log.debug(
-      'RoombaController initialized.',
+
+    const email =
+      typeof config.email === 'string'
+        ? config.email.trim()
+        : '';
+
+    const password =
+      typeof config.password === 'string'
+        ? config.password
+        : '';
+
+    const countryCode =
+      typeof config.countryCode === 'string'
+        ? config.countryCode
+        : 'CA';
+
+    this.transport =
+      new CloudV4Transport(
+        this.log,
+        {
+          email,
+          password,
+          countryCode,
+        },
+      );
+
+    this.transport.onStateChange(
+      this.handleTransportState.bind(this),
     );
   }
 
-  /**
-   * Return a snapshot of the latest known robot state.
-   */
+  public async connect(): Promise<void> {
+
+    this.log.info(
+      `Using Roomba transport: ${this.transport.name}`,
+    );
+
+    await this.transport.connect();
+  }
+
+  public async disconnect(): Promise<void> {
+    await this.transport.disconnect();
+  }
+
   public getState(): RoombaState {
+
     return {
       ...this.state,
     };
   }
 
-  /**
-   * Subscribe to robot state changes.
-   */
   public onStateChange(
     listener: RoombaStateListener,
-  ) {
+  ): void {
+
     this.listeners.add(listener);
 
     listener(
@@ -66,68 +105,34 @@ export class RoombaController {
     );
   }
 
-  /**
-   * Start cleaning.
-   *
-   * Stub implementation only.
-   */
-  public async startCleaning() {
-
-    this.log.info(
-      'Roomba command: START CLEANING',
-    );
-
-    this.updateState({
-      isCleaning: true,
-      isDocked: false,
-      isCharging: false,
-    });
+  public async startCleaning(): Promise<void> {
+    await this.transport.startCleaning();
   }
 
-  /**
-   * Stop/pause cleaning.
-   *
-   * Stub implementation only.
-   */
-  public async stopCleaning() {
-
-    this.log.info(
-      'Roomba command: STOP CLEANING',
-    );
-
-    this.updateState({
-      isCleaning: false,
-    });
+  public async stopCleaning(): Promise<void> {
+    await this.transport.stopCleaning();
   }
 
-  /**
-   * Send the Roomba back to its dock.
-   *
-   * Stub implementation only.
-   */
-  public async returnToDock() {
-
-    this.log.info(
-      'Roomba command: RETURN TO DOCK',
-    );
-
-    this.updateState({
-      isCleaning: false,
-      isDocked: true,
-      isCharging: true,
-    });
+  public async returnToDock(): Promise<void> {
+    await this.transport.returnToDock();
   }
 
-  /**
-   * Update controller state and notify HomeKit listeners.
-   */
-  private updateState(
-    changes: Partial<RoombaState>,
-  ) {
+  private handleTransportState(
+    transportState: RoombaTransportState,
+  ): void {
 
     this.state = {
-      ...this.state,
-      ...changes,
+      isCleaning:
+        transportState.isCleaning,
+
+      isDocked:
+        transportState.isDocked,
+
+      isCharging:
+        transportState.isCharging,
+
+      batteryLevel:
+        transportState.batteryLevel,
     };
 
     const snapshot =

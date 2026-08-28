@@ -28,9 +28,10 @@ export class RoombaAccessory {
   ) {
 
     this.controller =
-      new RoombaController(
-        this.platform.log,
-      );
+  new RoombaController(
+    this.platform.log,
+    this.platform.config,
+  );
 
     /**
      * Accessory information
@@ -128,6 +129,19 @@ export class RoombaAccessory {
       'Roomba accessory ready:',
       this.accessory.displayName,
     );
+    void this.controller
+      .connect()
+      .catch((error: unknown) => {
+
+        const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+        this.platform.log.error(
+          `Roomba connection failed: ${message}`,
+        );
+      });
   }
 
   /**
