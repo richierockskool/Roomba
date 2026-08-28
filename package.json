@@ -37,6 +37,7 @@
     "watch": "npm run build && npm link && nodemon"
   },
   "dependencies": {
+    "aws-iot-device-sdk-v2": "^1.28.0",
     "dorita980": "^4.0.0",
     "homebridge-lib": "^8.1.4"
   },
