@@ -1,23 +1,29 @@
 {
-  "name": "homebridge-plugin-name",
-  "displayName": "Plugin Name",
+  "name": "homebridge-roomba-pro",
+  "displayName": "Roomba",
   "type": "module",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "A short description about what your plugin does.",
-  "author": "Your Name",
+  "description": "A reliable Homebridge plugin for controlling supported iRobot Roomba robot vacuums in Apple Home.",
+  "author": "Jagger Hannah",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/USERNAME/GITHUB_PROJECT_NAME#readme",
+  "homepage": "https://github.com/richierockskool/Roomba#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "https://github.com/richierockskool/Roomba.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/richierockskool/Roomba/issues"
   },
   "keywords": [
     "homebridge-plugin",
-    "supports-hap"
+    "supports-hap",
+    "homebridge",
+    "roomba",
+    "irobot",
+    "vacuum",
+    "robot-vacuum",
+    "homekit"
   ],
   "main": "dist/index.js",
   "engines": {
