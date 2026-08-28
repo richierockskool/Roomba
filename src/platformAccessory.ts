@@ -1,148 +1,225 @@
-import type { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import type {
+  CharacteristicValue,
+  PlatformAccessory,
+  Service,
+} from 'homebridge';
 
-import type { ExampleHomebridgePlatform } from './platform.js';
+import type { RoombaPlatform } from './platform.js';
+
+import {
+  RoombaController,
+  type RoombaState,
+} from './roombaController.js';
 
 /**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+ * HomeKit representation of one Roomba.
  */
-export class ExamplePlatformAccessory {
-  private service: Service;
+export class RoombaAccessory {
 
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false,
-    Brightness: 100,
-  };
+  private readonly controller: RoombaController;
+
+  private readonly cleaningService: Service;
+  private readonly dockService: Service;
+  private readonly batteryService: Service;
 
   constructor(
-    private readonly platform: ExampleHomebridgePlatform,
+    private readonly platform: RoombaPlatform,
     private readonly accessory: PlatformAccessory,
   ) {
-    // set accessory information
-    this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
+    this.controller =
+      new RoombaController(
+        this.platform.log,
+      );
 
-    if (accessory.context.device.CustomService) {
-      // This is only required when using Custom Services and Characteristics not support by HomeKit
-      this.service = this.accessory.getService(this.platform.CustomServices[accessory.context.device.CustomService]) ||
-        this.accessory.addService(this.platform.CustomServices[accessory.context.device.CustomService]);
+    /**
+     * Accessory information
+     */
+    this.accessory
+      .getService(
+        this.platform.Service.AccessoryInformation,
+      )!
+      .setCharacteristic(
+        this.platform.Characteristic.Manufacturer,
+        'iRobot',
+      )
+      .setCharacteristic(
+        this.platform.Characteristic.Model,
+        'Roomba',
+      )
+      .setCharacteristic(
+        this.platform.Characteristic.SerialNumber,
+        'Not Connected',
+      );
+
+    /**
+     * Cleaning switch
+     */
+    this.cleaningService =
+      this.accessory.getService('Cleaning') ||
+      this.accessory.addService(
+        this.platform.Service.Switch,
+        'Cleaning',
+        'roomba-cleaning',
+      );
+
+    this.cleaningService
+      .setCharacteristic(
+        this.platform.Characteristic.Name,
+        'Cleaning',
+      );
+
+    this.cleaningService
+      .getCharacteristic(
+        this.platform.Characteristic.On,
+      )
+      .onSet(
+        this.setCleaning.bind(this),
+      )
+      .onGet(
+        this.getCleaning.bind(this),
+      );
+
+    /**
+     * Return to Dock switch
+     */
+    this.dockService =
+      this.accessory.getService('Return to Dock') ||
+      this.accessory.addService(
+        this.platform.Service.Switch,
+        'Return to Dock',
+        'roomba-dock',
+      );
+
+    this.dockService
+      .setCharacteristic(
+        this.platform.Characteristic.Name,
+        'Return to Dock',
+      );
+
+    this.dockService
+      .getCharacteristic(
+        this.platform.Characteristic.On,
+      )
+      .onSet(
+        this.setDock.bind(this),
+      );
+
+    /**
+     * Battery
+     */
+    this.batteryService =
+      this.accessory.getService(
+        this.platform.Service.Battery,
+      ) ||
+      this.accessory.addService(
+        this.platform.Service.Battery,
+        'Roomba Battery',
+      );
+
+    /**
+     * Listen for all state updates from RoombaController.
+     */
+    this.controller.onStateChange(
+      this.handleStateUpdate.bind(this),
+    );
+
+    this.platform.log.info(
+      'Roomba accessory ready:',
+      this.accessory.displayName,
+    );
+  }
+
+  /**
+   * Cleaning switch changed from Apple Home.
+   */
+  private async setCleaning(
+    value: CharacteristicValue,
+  ) {
+
+    const requestedOn =
+      value as boolean;
+
+    if (requestedOn) {
+      await this.controller.startCleaning();
     } else {
-      this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
+      await this.controller.stopCleaning();
+    }
+  }
+
+  /**
+   * HomeKit asks for current cleaning state.
+   */
+  private async getCleaning():
+    Promise<CharacteristicValue> {
+
+    return this.controller
+      .getState()
+      .isCleaning;
+  }
+
+  /**
+   * Return-to-dock switch.
+   *
+   * This is treated as a momentary command.
+   * Once triggered it automatically returns OFF.
+   */
+  private async setDock(
+    value: CharacteristicValue,
+  ) {
+
+    const requestedOn =
+      value as boolean;
+
+    if (!requestedOn) {
+      return;
     }
 
-    // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
+    await this.controller.returnToDock();
 
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
-
-    // register handlers for the On/Off Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOn.bind(this)) // SET - bind to the `setOn` method below
-      .onGet(this.getOn.bind(this)); // GET - bind to the `getOn` method below
-
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this)); // SET - bind to the `setBrightness` method below
-
-    /**
-     * Creating multiple services of the same type.
-     *
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     *
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same subtype id.)
-     */
-
-    // Example: add two "motion sensor" services to the accessory
-    const motionSensorOneService = this.accessory.getService('Motion Sensor One Name')
-      || this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
-
-    const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name')
-      || this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
-
-    /**
-     * Updating characteristics values asynchronously.
-     *
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     *
-     */
-    let motionDetected = false;
-    setInterval(() => {
-      // EXAMPLE - inverse the trigger
-      motionDetected = !motionDetected;
-
-      // push the new value to HomeKit
-      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-
-      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
+    this.dockService.updateCharacteristic(
+      this.platform.Characteristic.On,
+      false,
+    );
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
+   * Push controller state into HomeKit.
    */
-  async setOn(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+  private handleStateUpdate(
+    state: RoombaState,
+  ) {
 
-    this.platform.log.debug('Set Characteristic On ->', value);
-  }
+    this.cleaningService.updateCharacteristic(
+      this.platform.Characteristic.On,
+      state.isCleaning,
+    );
 
-  /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   *
-   * GET requests should return as fast as possible. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   *
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-   * In this case, you may decide not to implement `onGet` handlers, which may speed up
-   * the responsiveness of your device in the Home app.
+    this.batteryService.updateCharacteristic(
+      this.platform.Characteristic.BatteryLevel,
+      state.batteryLevel,
+    );
 
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
-   */
-  async getOn(): Promise<CharacteristicValue> {
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
+    this.batteryService.updateCharacteristic(
+      this.platform.Characteristic.StatusLowBattery,
+      state.batteryLevel <= 20
+        ? this.platform.Characteristic.StatusLowBattery.BATTERY_LEVEL_LOW
+        : this.platform.Characteristic.StatusLowBattery.BATTERY_LEVEL_NORMAL,
+    );
 
-    this.platform.log.debug('Get Characteristic On ->', isOn);
+    this.batteryService.updateCharacteristic(
+      this.platform.Characteristic.ChargingState,
+      state.isCharging
+        ? this.platform.Characteristic.ChargingState.CHARGING
+        : this.platform.Characteristic.ChargingState.NOT_CHARGING,
+    );
 
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-
-    return isOn;
-  }
-
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-   */
-  async setBrightness(value: CharacteristicValue) {
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
-
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
+    this.platform.log.debug(
+      'Roomba state:',
+      `cleaning=${state.isCleaning}`,
+      `docked=${state.isDocked}`,
+      `charging=${state.isCharging}`,
+      `battery=${state.batteryLevel}%`,
+    );
   }
 }
