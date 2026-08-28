@@ -1,6 +1,6 @@
 {
   "name": "homebridge-roomba-pro",
-  "displayName": "Roomba",
+  "displayName": "Roomba Pro",
   "type": "module",
   "version": "0.1.0",
   "private": true,
