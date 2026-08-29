@@ -12,6 +12,11 @@ import type {
   RoombaTransportState,
 } from './transports/roombaTransport.js';
 
+import type {
+  V4Room,
+} from './transports/v4MapClient.js';
+
+
 export interface RoombaState {
   isCleaning: boolean;
   isDocked: boolean;
@@ -119,7 +124,6 @@ export class RoombaController {
     );
   }
   public async startRoomCleaning(
-    p2mapId: string,
     roomId: string,
   ): Promise<void> {
 
@@ -128,7 +132,6 @@ export class RoombaController {
     );
 
     await this.transport.startRoomCleaning(
-      p2mapId,
       roomId,
     );
 
@@ -136,6 +139,11 @@ export class RoombaController {
       `RoombaController: ROOM ${roomId} handed to transport.`,
     );
   }
+  public getRooms(): V4Room[] {
+
+    return this.transport.getRooms();
+  }
+
   public async stopCleaning(): Promise<void> {
 
     this.log.info(

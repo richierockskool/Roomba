@@ -7,6 +7,11 @@
  * RoombaController and HomeKit never need to know whether
  * the robot is using local MQTT or the newer cloud protocol.
  */
+
+import type {
+  V4Room,
+} from './v4MapClient.js';
+
 export interface RoombaTransportState {
   isCleaning: boolean;
   isDocked: boolean;
@@ -50,10 +55,13 @@ export interface RoombaTransport {
  * Start a targeted Smart Map room-cleaning mission.
  */
 startRoomCleaning(
-  p2mapId: string,
   roomId: string,
 ): Promise<void>;
 
+/**
+ * Return rooms discovered from the active Smart Map.
+ */
+getRooms(): V4Room[];
   /**
    * Pause the current cleaning mission.
    */

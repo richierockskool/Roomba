@@ -19,7 +19,8 @@ export class RoombaAccessory {
   private readonly controller: RoombaController;
 
   private readonly cleaningService: Service;
-  private readonly kitchenDiningService: Service;
+  private readonly roomServices =
+    new Map<string, Service>();
   private readonly dockService: Service;
   private readonly batteryService: Service;
 
@@ -83,44 +84,15 @@ export class RoombaAccessory {
       );
 
     /**
-     * Return to Dock switch
-     */
-    /**
- * Kitchen/Dining room switch.
- *
- * Room 10 is the Kitchen/Dining region
- * discovered from the Roomba P2 Smart Map.
+ * Return to Dock switch
  */
-    this.kitchenDiningService =
-  this.accessory.getService('Kitchen/Dining') ||
+    this.dockService =
+  this.accessory.getService('Return to Dock') ||
   this.accessory.addService(
     this.platform.Service.Switch,
-    'Kitchen/Dining',
-    'roomba-room-10',
+    'Return to Dock',
+    'roomba-dock',
   );
-
-   
-    this.kitchenDiningService
-      .setCharacteristic(
-        this.platform.Characteristic.Name,
-        'Kitchen/Dining',
-      );
-
-    this.kitchenDiningService
-      .getCharacteristic(
-        this.platform.Characteristic.On,
-      )
-      .onSet(
-        this.setKitchenDining.bind(this),
-      );
-   
-    this.dockService =
-      this.accessory.getService('Return to Dock') ||
-      this.accessory.addService(
-        this.platform.Service.Switch,
-        'Return to Dock',
-        'roomba-dock',
-      );
 
     this.dockService
       .setCharacteristic(
@@ -135,18 +107,17 @@ export class RoombaAccessory {
       .onSet(
         this.setDock.bind(this),
       );
-
     /**
-     * Battery
-     */
+ * Battery
+ */
     this.batteryService =
-      this.accessory.getService(
-        this.platform.Service.Battery,
-      ) ||
-      this.accessory.addService(
-        this.platform.Service.Battery,
-        'Roomba Battery',
-      );
+  this.accessory.getService(
+    this.platform.Service.Battery,
+  ) ||
+  this.accessory.addService(
+    this.platform.Service.Battery,
+    'Roomba Battery',
+  );
 
     /**
      * Listen for all state updates from RoombaController.
@@ -161,6 +132,11 @@ export class RoombaAccessory {
     );
     void this.controller
       .connect()
+      .then(() => {
+
+        this.configureRoomServices();
+
+      })
       .catch((error: unknown) => {
 
         const message =
@@ -209,29 +185,7 @@ export class RoombaAccessory {
   /**
  * Kitchen/Dining switch changed from Apple Home.
  */
-  private async setKitchenDining(
-    value: CharacteristicValue,
-  ): Promise<void> {
-
-    const requestedOn =
-    value as boolean;
-
-    this.platform.log.info(
-      `HomeKit Kitchen/Dining SET received: ${String(requestedOn)}`,
-    );
-
-    if (requestedOn) {
-
-      await this.controller.startRoomCleaning(
-        '20F7790E082EFE7D6485D55ADCCC0AE8-1787706030',
-        '10',
-      );
-
-    } else {
-
-      await this.controller.stopCleaning();
-    }
-  }
+  
   private async getCleaning():
     Promise<CharacteristicValue> {
 
@@ -268,6 +222,95 @@ export class RoombaAccessory {
   /**
    * Push controller state into HomeKit.
    */
+  /**
+ * Create HomeKit switches for every named room
+ * discovered from the active Roomba Smart Map.
+ */
+  private configureRoomServices(): void {
+
+    const rooms =
+    this.controller.getRooms();
+
+    this.platform.log.info(
+      `Configuring ${rooms.length} Roomba room service(s).`,
+    );
+
+    for (const room of rooms) {
+
+      const subtype =
+      `roomba-room-${room.id}`;
+
+      const service =
+      this.accessory.getServiceById(
+        this.platform.Service.Switch,
+        subtype,
+      ) ||
+      this.accessory.addService(
+        this.platform.Service.Switch,
+        room.name,
+        subtype,
+      );
+
+      service.setCharacteristic(
+        this.platform.Characteristic.Name,
+        room.name,
+      );
+
+      service
+        .getCharacteristic(
+          this.platform.Characteristic.On,
+        )
+        .onSet(
+          async (
+            value: CharacteristicValue,
+          ) => {
+
+            await this.setRoomCleaning(
+              room.id,
+              room.name,
+              value,
+            );
+          },
+        );
+
+      this.roomServices.set(
+        room.id,
+        service,
+      );
+
+      this.platform.log.info(
+        `Roomba HomeKit room registered: ${room.name} [${room.id}]`,
+      );
+    }
+  }
+
+  /**
+ * Generic mapped-room switch handler.
+ */
+  private async setRoomCleaning(
+    roomId: string,
+    roomName: string,
+    value: CharacteristicValue,
+  ): Promise<void> {
+
+    const requestedOn =
+    value as boolean;
+
+    this.platform.log.info(
+      `HomeKit room SET received: ${roomName} [${roomId}] = ${String(requestedOn)}`,
+    );
+
+    if (requestedOn) {
+
+      await this.controller.startRoomCleaning(
+        roomId,
+      );
+
+    } else {
+
+      await this.controller.stopCleaning();
+    }
+  }
   private handleStateUpdate(
     state: RoombaState,
   ) {

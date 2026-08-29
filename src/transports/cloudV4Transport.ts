@@ -19,6 +19,7 @@ import {
 
 import {
   V4MapClient,
+  type V4Room,
 } from './v4MapClient.js';
 
 /**
@@ -166,27 +167,52 @@ export class CloudV4Transport implements RoombaTransport {
  * Start a targeted P2 Smart Map room-cleaning mission.
  */
   public async startRoomCleaning(
-    p2mapId: string,
     roomId: string,
   ): Promise<void> {
 
     if (
       !this.connected ||
-    !this.mqttClient
+    !this.mqttClient ||
+    !this.mapClient
     ) {
       throw new Error(
         'Cloud V4 transport is not connected.',
       );
     }
 
+    const mapInfo =
+    this.mapClient.getMapInfo();
+
+    if (!mapInfo) {
+      throw new Error(
+        'No active Roomba Smart Map is available.',
+      );
+    }
+
+    const room =
+    mapInfo.rooms.find(
+      candidate =>
+        candidate.id === roomId,
+    );
+
+    if (!room) {
+      throw new Error(
+        `Roomba room ${roomId} is not present on the active Smart Map.`,
+      );
+    }
+
     await this.mqttClient.sendRoomCleaningCommand(
-      p2mapId,
-      roomId,
+      mapInfo.p2mapId,
+      room.id,
     );
 
     this.log.info(
-      `Roomba V4 targeted room cleaning started: room=${roomId}`,
+      `Roomba V4 targeted room cleaning started: ${room.name} [${room.id}]`,
     );
+  }
+  public getRooms(): V4Room[] {
+
+    return this.mapClient?.getRooms() ?? [];
   }
 
   public async pauseCleaning(): Promise<void> {

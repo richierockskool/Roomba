@@ -20,11 +20,22 @@ import type {
 interface UnknownObject {
   [key: string]: unknown;
 }
+export interface V4Room {
+  id: string;
+  name: string;
+}
+
+export interface V4MapInfo {
+  p2mapId: string;
+  rooms: V4Room[];
+}
 
 /**
  * Smart Map helper for Prime / V4-generation Roombas.
  */
 export class V4MapClient {
+
+  private mapInfo?: V4MapInfo;
 
   constructor(
     private readonly log: Logging,
@@ -182,42 +193,200 @@ export class V4MapClient {
     }
 
     const payload =
-      await response.json() as unknown;
+  await response.json() as unknown;
 
-    this.inspectMapResponse(
-      payload,
-    );
-  }
+    this.mapInfo =
+  this.parseMapResponse(
+    payload,
+  );
 
-  private inspectMapResponse(
-    payload: unknown,
-  ): void {
-
-    if (
-      typeof payload !== 'object' ||
-      payload === null
-    ) {
+    if (!this.mapInfo) {
 
       this.log.warn(
-        'Roomba V4 P2 map response was not an object.',
+        'Roomba V4 Smart Map contained no usable active map.',
       );
 
       return;
     }
 
-    const root =
-      payload as UnknownObject;
-
     this.log.info(
-      `Roomba V4 P2 map response keys: ${Object.keys(root).join(', ')}`,
+      `Roomba V4 Smart Map ready: ${this.mapInfo.rooms.length} named room(s).`,
     );
 
-    /**
-     * Diagnostic only:
-     * safely log structure but not credentials.
-     */
-    this.log.info(
-      `Roomba V4 P2 MAP METADATA: ${JSON.stringify(root)}`,
-    );
+    for (const room of this.mapInfo.rooms) {
+
+      this.log.info(
+        `Roomba room discovered: ${room.name} [${room.id}]`,
+      );
+    }
+  }
+
+  private parseMapResponse(
+    payload: unknown,
+  ): V4MapInfo | undefined {
+
+    if (!Array.isArray(payload)) {
+
+      this.log.warn(
+        'Roomba V4 P2 map response was not an array.',
+      );
+
+      return undefined;
+    }
+
+    for (const item of payload) {
+
+      const map =
+      this.getObject(
+        item,
+      );
+
+      if (!map) {
+        continue;
+      }
+
+      const p2mapId =
+      this.getString(
+        map.p2map_id,
+      );
+
+      const state =
+      this.getString(
+        map.state,
+      );
+
+      const visible =
+      map.visible === true;
+
+      if (
+        !p2mapId ||
+      state !== 'active' ||
+      !visible
+      ) {
+        continue;
+      }
+
+      const roomsMetadata =
+      map.rooms_metadata;
+
+      const rooms: V4Room[] = [];
+
+      if (Array.isArray(roomsMetadata)) {
+
+        for (const item of roomsMetadata) {
+
+          const room =
+          this.getObject(
+            item,
+          );
+
+          if (!room) {
+            continue;
+          }
+
+          const roomId =
+          this.getString(
+            room.room_id,
+          );
+
+          const metadata =
+          this.getObject(
+            room.room_metadata,
+          );
+
+          const roomName =
+          this.getString(
+            metadata?.name,
+          );
+
+          /**
+         * Only expose rooms which the user has
+         * actually named in the iRobot app.
+         */
+          if (
+            !roomId ||
+          !roomName
+          ) {
+            continue;
+          }
+
+          rooms.push({
+            id:
+            roomId,
+
+            name:
+            roomName,
+          });
+        }
+      }
+
+      return {
+        p2mapId,
+        rooms,
+      };
+    }
+
+    return undefined;
+  }
+
+  private getObject(
+    value: unknown,
+  ): UnknownObject | undefined {
+
+    if (
+      typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value)
+    ) {
+
+      return value as UnknownObject;
+    }
+
+    return undefined;
+  }
+
+  private getString(
+    value: unknown,
+  ): string | undefined {
+
+    if (
+      typeof value === 'string' &&
+    value.trim().length > 0
+    ) {
+
+      return value.trim();
+    }
+
+    return undefined;
+  }
+  public getMapInfo():
+V4MapInfo | undefined {
+
+    if (!this.mapInfo) {
+      return undefined;
+    }
+
+    return {
+      p2mapId:
+      this.mapInfo.p2mapId,
+
+      rooms:
+      this.mapInfo.rooms.map(
+        room => ({
+          ...room,
+        }),
+      ),
+    };
+  }
+
+  public getRooms():
+V4Room[] {
+
+    return this.mapInfo?.rooms.map(
+      room => ({
+        ...room,
+      }),
+    ) ?? [];
   }
 }
+
