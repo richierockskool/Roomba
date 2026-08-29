@@ -146,6 +146,7 @@ export class CloudV4Transport implements RoombaTransport {
 
     this.mqttClient = undefined;
     this.session = undefined;
+    this.mapClient = undefined;
 
     if (mqttClient) {
       await mqttClient.disconnect();

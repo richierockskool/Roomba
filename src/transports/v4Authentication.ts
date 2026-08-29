@@ -8,9 +8,18 @@ export interface V4Credentials {
 
 export interface V4Deployment {
   httpBase: string;
+  httpBaseAuth: string;
   mqttAts: string;
   irbtTopics: string;
   awsRegion: string;
+}
+
+export interface V4CloudCredentials {
+  accessKeyId: string;
+  secretKey: string;
+  sessionToken: string;
+  cognitoId: string;
+  expiration?: string;
 }
 
 export interface V4Robot {
@@ -22,6 +31,8 @@ export interface V4Robot {
 
 export interface V4Session {
   deployment: V4Deployment;
+
+  cloudCredentials: V4CloudCredentials;
 
   iotToken: string;
   iotSignature: string;
@@ -36,6 +47,7 @@ interface DiscoveryResult {
   gigyaApiKey: string;
   gigyaDomain: string;
 }
+
 
 interface GigyaResult {
   uid: string;
@@ -211,6 +223,11 @@ export class V4Authentication {
             deploymentObject.httpBase,
             'httpBase',
           ),
+        httpBaseAuth:
+  this.requireString(
+    deploymentObject.httpBaseAuth,
+    'httpBaseAuth',
+  ),   
 
         mqttAts:
           this.requireString(
@@ -315,6 +332,8 @@ export class V4Authentication {
     const payload =
       await response.json() as UnknownObject;
 
+   
+
     const statusCode =
       typeof payload.statusCode === 'number'
         ? payload.statusCode
@@ -410,6 +429,12 @@ export class V4Authentication {
     const payload =
       await response.json() as UnknownObject;
 
+    const credentials =
+  this.requireObject(
+    payload.credentials,
+    'credentials',
+  );
+
     const robotsObject =
       this.requireObject(
         payload.robots,
@@ -457,6 +482,36 @@ export class V4Authentication {
 
     return {
       deployment,
+      cloudCredentials: {
+        accessKeyId:
+    this.requireString(
+      credentials.AccessKeyId,
+      'credentials.AccessKeyId',
+    ),
+
+        secretKey:
+    this.requireString(
+      credentials.SecretKey,
+      'credentials.SecretKey',
+    ),
+
+        sessionToken:
+    this.requireString(
+      credentials.SessionToken,
+      'credentials.SessionToken',
+    ),
+
+        cognitoId:
+    this.requireString(
+      credentials.CognitoId,
+      'credentials.CognitoId',
+    ),
+
+        expiration:
+    this.optionalString(
+      credentials.Expiration,
+    ),
+      },
 
       iotToken:
         this.requireString(

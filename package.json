@@ -37,6 +37,9 @@
     "watch": "npm run build && npm link && nodemon"
   },
   "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@smithy/protocol-http": "^5.6.2",
+    "@smithy/signature-v4": "^5.7.3",
     "aws-iot-device-sdk-v2": "^1.28.0",
     "dorita980": "^4.0.0",
     "homebridge-lib": "^8.1.4"
