@@ -189,7 +189,46 @@ export class V4MqttClient {
 
     await this.requestShadow();
   }
+  public async sendCommand(
+    command: string,
+  ): Promise<void> {
 
+    const client =
+    this.requireClient();
+
+    const topic =
+    `${this.session.deployment.irbtTopics}` +
+    `/things/${this.robot.blid}/cmd`;
+
+    const payload = {
+      command,
+      time:
+      Math.floor(
+        Date.now() / 1000,
+      ),
+      initiator:
+      'localApp',
+    };
+
+    await client.publish({
+      topicName: topic,
+
+      qos:
+      mqtt5.QoS.AtLeastOnce,
+
+      payload:
+      Buffer.from(
+        JSON.stringify(
+          payload,
+        ),
+        'utf8',
+      ),
+    });
+
+    this.log.info(
+      `Roomba command published: ${command}`,
+    );
+  }
   public async disconnect(): Promise<void> {
 
     const client =

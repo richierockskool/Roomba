@@ -106,15 +106,42 @@ export class RoombaController {
   }
 
   public async startCleaning(): Promise<void> {
+
+    this.log.info(
+      'RoombaController: START requested from HomeKit.',
+    );
+
     await this.transport.startCleaning();
+
+    this.log.info(
+      'RoombaController: START handed to transport.',
+    );
   }
 
   public async stopCleaning(): Promise<void> {
+
+    this.log.info(
+      'RoombaController: STOP requested from HomeKit.',
+    );
+
     await this.transport.stopCleaning();
+
+    this.log.info(
+      'RoombaController: STOP handed to transport.',
+    );
   }
 
   public async returnToDock(): Promise<void> {
+
+    this.log.info(
+      'RoombaController: DOCK requested from HomeKit.',
+    );
+
     await this.transport.returnToDock();
+
+    this.log.info(
+      'RoombaController: DOCK handed to transport.',
+    );
   }
 
   private handleTransportState(

@@ -426,16 +426,20 @@ export class CloudV4Transport implements RoombaTransport {
 
     if (
       !this.connected ||
-      !this.session ||
-      !this.mqttClient
+    !this.session ||
+    !this.mqttClient
     ) {
       throw new Error(
         'Cloud V4 transport is not connected.',
       );
     }
 
-    throw new Error(
-      `Roomba command "${command}" is not enabled until V4 state parsing is verified.`,
+    await this.mqttClient.sendCommand(
+      command,
+    );
+
+    this.log.info(
+      `Roomba V4 command sent: ${command}`,
     );
   }
 }
