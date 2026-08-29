@@ -118,6 +118,10 @@ export class V4MqttClient {
           `Roomba MQTT message received: ${topic}`,
         );
 
+        this.log.info(
+          `Roomba V4 RAW STATE [${topic}]: ${payload}`,
+        );
+
         for (const listener of this.listeners) {
           listener({
             topic,
@@ -286,11 +290,26 @@ export class V4MqttClient {
       `$aws/things/${blid}/shadow/name/ro-stats/update`,
       `$aws/things/${blid}/shadow/name/ro-stats/update/accepted`,
 
+      `$aws/things/${blid}/shadow/name/ro-configinfo/get/accepted`,
+      `$aws/things/${blid}/shadow/name/ro-configinfo/update`,
+      `$aws/things/${blid}/shadow/name/ro-configinfo/update/accepted`,
+
+      `$aws/things/${blid}/shadow/name/ro-services/get/accepted`,
+      `$aws/things/${blid}/shadow/name/ro-services/update`,
+      `$aws/things/${blid}/shadow/name/ro-services/update/accepted`,
+
+      `$aws/things/${blid}/shadow/name/rw-settings/get/accepted`,
+      `$aws/things/${blid}/shadow/name/rw-settings/update`,
+      `$aws/things/${blid}/shadow/name/rw-settings/update/accepted`,
+
+      `$aws/things/${blid}/shadow/name/rw-schedule/get/accepted`,
+      `$aws/things/${blid}/shadow/name/rw-schedule/update`,
+      `$aws/things/${blid}/shadow/name/rw-schedule/update/accepted`,
+
       `$aws/things/${blid}/shadow/name/rw-constatus/get/accepted`,
       `$aws/things/${blid}/shadow/name/rw-constatus/update`,
       `$aws/things/${blid}/shadow/name/rw-constatus/update/accepted`,
     ];
-
     let acceptedCount = 0;
 
     for (const topicFilter of topicFilters) {
@@ -366,6 +385,10 @@ export class V4MqttClient {
       `$aws/things/${blid}/shadow/get`,
       `$aws/things/${blid}/shadow/name/ro-currentstate/get`,
       `$aws/things/${blid}/shadow/name/ro-stats/get`,
+      `$aws/things/${blid}/shadow/name/ro-configinfo/get`,
+      `$aws/things/${blid}/shadow/name/ro-services/get`,
+      `$aws/things/${blid}/shadow/name/rw-settings/get`,
+      `$aws/things/${blid}/shadow/name/rw-schedule/get`,
       `$aws/things/${blid}/shadow/name/rw-constatus/get`,
     ];
 
