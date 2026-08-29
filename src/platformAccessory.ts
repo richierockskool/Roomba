@@ -99,6 +99,7 @@ export class RoombaAccessory {
     'roomba-room-10',
   );
 
+   
     this.kitchenDiningService
       .setCharacteristic(
         this.platform.Characteristic.Name,
@@ -112,6 +113,7 @@ export class RoombaAccessory {
       .onSet(
         this.setKitchenDining.bind(this),
       );
+   
     this.dockService =
       this.accessory.getService('Return to Dock') ||
       this.accessory.addService(
