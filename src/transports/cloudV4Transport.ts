@@ -17,6 +17,10 @@ import {
   type V4MqttMessage,
 } from './v4MqttClient.js';
 
+import {
+  V4MapClient,
+} from './v4MapClient.js';
+
 /**
  * Cloud transport for newer V4-generation iRobot robots.
  */
@@ -38,6 +42,7 @@ export class CloudV4Transport implements RoombaTransport {
 
   private session?: V4Session;
   private mqttClient?: V4MqttClient;
+  private mapClient?: V4MapClient;
 
   private connected = false;
 
@@ -98,6 +103,14 @@ export class CloudV4Transport implements RoombaTransport {
         robot,
       );
 
+    this.mapClient =
+  new V4MapClient(
+    this.log,
+    session,
+    robot,
+  );
+
+    await this.mapClient.discoverRooms();
     mqttClient.onMessage(
       this.handleMqttMessage.bind(this),
     );
