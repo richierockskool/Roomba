@@ -226,13 +226,13 @@ export class V4MqttClient {
    * AWS IoT device shadows.
    */
   private async subscribeToRobotState():
-    Promise<void> {
+  Promise<void> {
 
     const client =
-      this.requireClient();
+    this.requireClient();
 
     const blid =
-      this.robot.blid;
+    this.robot.blid;
 
     const topicFilters = [
       `$aws/things/${blid}/shadow/get/accepted`,
@@ -252,38 +252,68 @@ export class V4MqttClient {
       `$aws/things/${blid}/shadow/name/rw-constatus/update/accepted`,
     ];
 
-    const result =
-      await client.subscribe({
-        subscriptions:
-          topicFilters.map(
-            (topicFilter) => ({
+    let acceptedCount = 0;
+
+    for (const topicFilter of topicFilters) {
+
+      try {
+
+        const result =
+        await client.subscribe({
+          subscriptions: [
+            {
               topicFilter,
               qos:
                 mqtt5.QoS.AtLeastOnce,
-            }),
-          ),
-      });
+            },
+          ],
+        });
 
-    const failed =
-      result.reasonCodes.some(
-        (reasonCode) =>
-          reasonCode >= 128,
-      );
+        const reasonCode =
+        result.reasonCodes[0];
 
-    if (failed) {
+        if (
+          reasonCode !== undefined &&
+        reasonCode < 128
+        ) {
+
+          acceptedCount += 1;
+
+          this.log.info(
+            `Roomba MQTT subscription accepted: ${topicFilter}`,
+          );
+
+        } else {
+
+          this.log.warn(
+            `Roomba MQTT subscription rejected: ${topicFilter} ` +
+          `(reason code ${String(reasonCode)})`,
+          );
+        }
+
+      } catch (error) {
+
+        const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+        this.log.warn(
+          `Roomba MQTT subscription failed: ${topicFilter} — ${message}`,
+        );
+      }
+    }
+
+    if (acceptedCount === 0) {
       throw new Error(
-        'One or more Roomba MQTT subscriptions were rejected.',
+        'All Roomba MQTT state subscriptions were rejected.',
       );
     }
 
     this.log.info(
-      'Subscribed to Roomba V4 state topics.',
+      `Roomba MQTT subscriptions ready: ${acceptedCount}/${topicFilters.length} accepted.`,
     );
   }
-
-  /**
-   * Request the current state immediately after connecting.
-   */
   private async requestShadow():
     Promise<void> {
 
