@@ -19,6 +19,7 @@ export class RoombaAccessory {
   private readonly controller: RoombaController;
 
   private readonly cleaningService: Service;
+  private readonly kitchenDiningService: Service;
   private readonly dockService: Service;
   private readonly batteryService: Service;
 
@@ -84,6 +85,33 @@ export class RoombaAccessory {
     /**
      * Return to Dock switch
      */
+    /**
+ * Kitchen/Dining room switch.
+ *
+ * Room 10 is the Kitchen/Dining region
+ * discovered from the Roomba P2 Smart Map.
+ */
+    this.kitchenDiningService =
+  this.accessory.getService('Kitchen/Dining') ||
+  this.accessory.addService(
+    this.platform.Service.Switch,
+    'Kitchen/Dining',
+    'roomba-room-10',
+  );
+
+    this.kitchenDiningService
+      .setCharacteristic(
+        this.platform.Characteristic.Name,
+        'Kitchen/Dining',
+      );
+
+    this.kitchenDiningService
+      .getCharacteristic(
+        this.platform.Characteristic.On,
+      )
+      .onSet(
+        this.setKitchenDining.bind(this),
+      );
     this.dockService =
       this.accessory.getService('Return to Dock') ||
       this.accessory.addService(
@@ -171,6 +199,33 @@ export class RoombaAccessory {
       this.platform.log.info(
         'HomeKit Cleaning requested OFF.',
       );
+
+      await this.controller.stopCleaning();
+    }
+  }
+
+  /**
+ * Kitchen/Dining switch changed from Apple Home.
+ */
+  private async setKitchenDining(
+    value: CharacteristicValue,
+  ): Promise<void> {
+
+    const requestedOn =
+    value as boolean;
+
+    this.platform.log.info(
+      `HomeKit Kitchen/Dining SET received: ${String(requestedOn)}`,
+    );
+
+    if (requestedOn) {
+
+      await this.controller.startRoomCleaning(
+        '20F7790E082EFE7D6485D55ADCCC0AE8-1787706030',
+        '10',
+      );
+
+    } else {
 
       await this.controller.stopCleaning();
     }

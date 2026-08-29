@@ -106,6 +106,7 @@ export class RoombaController {
   }
 
   public async startCleaning(): Promise<void> {
+    
 
     this.log.info(
       'RoombaController: START requested from HomeKit.',
@@ -117,7 +118,24 @@ export class RoombaController {
       'RoombaController: START handed to transport.',
     );
   }
+  public async startRoomCleaning(
+    p2mapId: string,
+    roomId: string,
+  ): Promise<void> {
 
+    this.log.info(
+      `RoombaController: ROOM ${roomId} requested from HomeKit.`,
+    );
+
+    await this.transport.startRoomCleaning(
+      p2mapId,
+      roomId,
+    );
+
+    this.log.info(
+      `RoombaController: ROOM ${roomId} handed to transport.`,
+    );
+  }
   public async stopCleaning(): Promise<void> {
 
     this.log.info(

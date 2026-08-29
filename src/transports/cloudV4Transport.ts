@@ -132,6 +132,8 @@ export class CloudV4Transport implements RoombaTransport {
 
     this.connected = true;
 
+    
+
     this.log.info(
       `Cloud V4 transport fully connected to ${robot.name} (${robot.sku}).`,
     );
@@ -159,6 +161,32 @@ export class CloudV4Transport implements RoombaTransport {
 
   public async startCleaning(): Promise<void> {
     await this.sendCommand('start');
+  }
+  /**
+ * Start a targeted P2 Smart Map room-cleaning mission.
+ */
+  public async startRoomCleaning(
+    p2mapId: string,
+    roomId: string,
+  ): Promise<void> {
+
+    if (
+      !this.connected ||
+    !this.mqttClient
+    ) {
+      throw new Error(
+        'Cloud V4 transport is not connected.',
+      );
+    }
+
+    await this.mqttClient.sendRoomCleaningCommand(
+      p2mapId,
+      roomId,
+    );
+
+    this.log.info(
+      `Roomba V4 targeted room cleaning started: room=${roomId}`,
+    );
   }
 
   public async pauseCleaning(): Promise<void> {
@@ -288,42 +316,49 @@ export class CloudV4Transport implements RoombaTransport {
         missionStatus?.cycle,
       );
 
-      const isCleaning =
-      phase === 'run' ||
-      phase === 'resume' ||
-      cycle === 'clean';
-
-      const isCharging =
-      phase === 'charge';
-
-      const isDocked =
-      phase === 'charge' ||
-      phase === 'dock';
-
       const changes:
-      Partial<RoombaTransportState> = {};
+Partial<RoombaTransportState> = {};
 
       if (batteryLevel !== undefined) {
+
         changes.batteryLevel =
-        Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(
-              batteryLevel,
-            ),
-          ),
-        );
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          batteryLevel,
+        ),
+      ),
+    );
       }
 
-      changes.isCleaning =
-      isCleaning;
+      /**
+ * Mission state updates can be partial.
+ *
+ * Only change cleaning / charging / docked state
+ * when phase or cycle is actually present.
+ *
+ * This prevents battery-only MQTT updates from
+ * incorrectly clearing an active cleaning mission.
+ */
+      if (
+        phase !== undefined ||
+  cycle !== undefined
+      ) {
 
-      changes.isCharging =
-      isCharging;
+        changes.isCleaning =
+    phase === 'run' ||
+    phase === 'resume' ||
+    cycle === 'clean';
 
-      changes.isDocked =
-      isDocked;
+        changes.isCharging =
+    phase === 'charge';
+
+        changes.isDocked =
+    phase === 'charge' ||
+    phase === 'dock';
+      }
 
       this.updateState(
         changes,

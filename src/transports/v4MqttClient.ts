@@ -233,6 +233,70 @@ export class V4MqttClient {
       `Roomba command published: ${command}`,
     );
   }
+  /**
+ * Start a targeted P2 Smart Map room-cleaning mission.
+ *
+ * Prime / V4 robots use p2map_id + regions.
+ * This is different from the Classic pmap protocol.
+ */
+  public async sendRoomCleaningCommand(
+    p2mapId: string,
+    roomId: string,
+  ): Promise<void> {
+
+    const client =
+    this.requireClient();
+
+    const topic =
+    `${this.session.deployment.irbtTopics}` +
+    `/things/${this.robot.blid}/cmd`;
+
+    const payload = {
+      command:
+      'start',
+
+      time:
+      Math.floor(
+        Date.now() / 1000,
+      ),
+
+      initiator:
+      'localApp',
+
+      p2map_id:
+      p2mapId,
+
+      regions: [
+        {
+          region_id:
+          roomId,
+
+          type:
+          'rid',
+        },
+      ],
+    };
+
+    await client.publish({
+      topicName:
+      topic,
+
+      qos:
+      mqtt5.QoS.AtLeastOnce,
+
+      payload:
+      Buffer.from(
+        JSON.stringify(
+          payload,
+        ),
+        'utf8',
+      ),
+    });
+
+    this.log.info(
+      `Roomba targeted room command published: room=${roomId}`,
+    );
+  }
   public async disconnect(): Promise<void> {
 
     const client =

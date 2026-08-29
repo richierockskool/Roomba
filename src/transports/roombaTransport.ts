@@ -47,6 +47,14 @@ export interface RoombaTransport {
   startCleaning(): Promise<void>;
 
   /**
+ * Start a targeted Smart Map room-cleaning mission.
+ */
+startRoomCleaning(
+  p2mapId: string,
+  roomId: string,
+): Promise<void>;
+
+  /**
    * Pause the current cleaning mission.
    */
   pauseCleaning(): Promise<void>;
