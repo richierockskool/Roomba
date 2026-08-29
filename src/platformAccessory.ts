@@ -151,19 +151,30 @@ export class RoombaAccessory {
     value: CharacteristicValue,
   ) {
 
+    this.platform.log.info(
+      `HomeKit Cleaning SET received: ${String(value)}`,
+    );
+
     const requestedOn =
-      value as boolean;
+    value as boolean;
 
     if (requestedOn) {
+
+      this.platform.log.info(
+        'HomeKit Cleaning requested ON.',
+      );
+
       await this.controller.startCleaning();
+
     } else {
+
+      this.platform.log.info(
+        'HomeKit Cleaning requested OFF.',
+      );
+
       await this.controller.stopCleaning();
     }
   }
-
-  /**
-   * HomeKit asks for current cleaning state.
-   */
   private async getCleaning():
     Promise<CharacteristicValue> {
 
