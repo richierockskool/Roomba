@@ -12,6 +12,11 @@ import {
   type V4Session,
 } from './v4Authentication.js';
 
+import {
+  V4MqttClient,
+  type V4MqttMessage,
+} from './v4MqttClient.js';
+
 /**
  * Cloud transport for newer V4-generation iRobot robots.
  */
@@ -32,6 +37,8 @@ export class CloudV4Transport implements RoombaTransport {
   private readonly authentication: V4Authentication;
 
   private session?: V4Session;
+  private mqttClient?: V4MqttClient;
+
   private connected = false;
 
   constructor(
@@ -56,11 +63,16 @@ export class CloudV4Transport implements RoombaTransport {
       'Connecting iRobot Cloud V4 transport...',
     );
 
-    this.session =
+    /**
+     * Step 1:
+     * Authenticate with iRobot and obtain the
+     * short-lived AWS IoT session.
+     */
+    const session =
       await this.authentication.authenticate();
 
     const robot =
-      this.session.robots[0];
+      session.robots[0];
 
     if (!robot) {
       throw new Error(
@@ -68,28 +80,63 @@ export class CloudV4Transport implements RoombaTransport {
       );
     }
 
+    this.session =
+      session;
+
+    this.log.info(
+      `Cloud V4 authenticated for ${robot.name} (${robot.sku}).`,
+    );
+
+    /**
+     * Step 2:
+     * Establish the live AWS IoT MQTT connection.
+     */
+    const mqttClient =
+      new V4MqttClient(
+        this.log,
+        session,
+        robot,
+      );
+
+    mqttClient.onMessage(
+      this.handleMqttMessage.bind(this),
+    );
+
+    this.mqttClient =
+      mqttClient;
+
+    try {
+
+      await mqttClient.connect();
+
+    } catch (error) {
+
+      this.mqttClient = undefined;
+      this.session = undefined;
+
+      throw error;
+    }
+
     this.connected = true;
 
     this.log.info(
-      `Cloud V4 transport connected to ${robot.name} (${robot.sku}).`,
+      `Cloud V4 transport fully connected to ${robot.name} (${robot.sku}).`,
     );
-
-    /*
-     * AWS IoT MQTT connection comes next.
-     *
-     * At this checkpoint we have intentionally stopped
-     * after successful account/robot discovery.
-     */
   }
 
   public async disconnect(): Promise<void> {
 
-    if (!this.connected) {
-      return;
-    }
-
     this.connected = false;
+
+    const mqttClient =
+      this.mqttClient;
+
+    this.mqttClient = undefined;
     this.session = undefined;
+
+    if (mqttClient) {
+      await mqttClient.disconnect();
+    }
 
     this.log.info(
       'Cloud V4 transport disconnected.',
@@ -134,24 +181,54 @@ export class CloudV4Transport implements RoombaTransport {
     );
   }
 
+  /**
+   * Receive raw MQTT traffic from the Roomba.
+   *
+   * For this checkpoint we intentionally log the topic
+   * and payload only.
+   *
+   * Once we know the exact Roomba 105 shadow structure,
+   * the next patch will normalize battery, mission,
+   * dock and charging state.
+   */
+  private handleMqttMessage(
+    message: V4MqttMessage,
+  ): void {
+
+    this.log.info(
+      `Roomba V4 MQTT topic: ${message.topic}`,
+    );
+
+    if (message.payload.length > 0) {
+
+      this.log.info(
+        `Roomba V4 MQTT payload: ${message.payload}`,
+      );
+    }
+  }
+
+  /**
+   * Command publishing deliberately remains disabled.
+   *
+   * First we prove stable inbound state from the
+   * physical Roomba before allowing HomeKit to move it.
+   */
   private async sendCommand(
     command: string,
   ): Promise<void> {
 
-    if (!this.connected || !this.session) {
+    if (
+      !this.connected ||
+      !this.session ||
+      !this.mqttClient
+    ) {
       throw new Error(
         'Cloud V4 transport is not connected.',
       );
     }
 
-    /*
-     * Deliberately blocked until MQTT is installed.
-     *
-     * We do NOT pretend a command succeeded merely because
-     * HomeKit requested it.
-     */
     throw new Error(
-      `Roomba command "${command}" is not available until the V4 MQTT connection is established.`,
+      `Roomba command "${command}" is not enabled until V4 state parsing is verified.`,
     );
   }
 }
