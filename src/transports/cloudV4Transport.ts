@@ -195,24 +195,231 @@ export class CloudV4Transport implements RoombaTransport {
     message: V4MqttMessage,
   ): void {
 
-    this.log.info(
+    this.log.debug(
       `Roomba V4 MQTT topic: ${message.topic}`,
     );
 
-    if (message.payload.length > 0) {
+    if (message.payload.length === 0) {
+      return;
+    }
+
+    let payload: unknown;
+
+    try {
+
+      payload =
+      JSON.parse(
+        message.payload,
+      );
+
+    } catch {
+
+      this.log.warn(
+        `Roomba V4 MQTT payload was not valid JSON: ${message.topic}`,
+      );
+
+      return;
+    }
+
+    if (
+      typeof payload !== 'object' ||
+    payload === null
+    ) {
+      return;
+    }
+
+    const root =
+    payload as Record<string, unknown>;
+
+    const state =
+    this.getObject(
+      root.state,
+    );
+
+    const reported =
+    this.getObject(
+      state?.reported,
+    );
+
+    if (!reported) {
+      return;
+    }
+
+    /**
+   * ro-currentstate
+   */
+    if (
+      message.topic.includes(
+        '/shadow/name/ro-currentstate/',
+      )
+    ) {
+
+      const batteryLevel =
+      this.getNumber(
+        reported.batPct,
+      );
+
+      const missionStatus =
+      this.getObject(
+        reported.cleanMissionStatus,
+      );
+
+      const phase =
+      this.getString(
+        missionStatus?.phase,
+      );
+
+      const cycle =
+      this.getString(
+        missionStatus?.cycle,
+      );
+
+      const isCleaning =
+      phase === 'run' ||
+      phase === 'resume' ||
+      cycle === 'clean';
+
+      const isCharging =
+      phase === 'charge';
+
+      const isDocked =
+      phase === 'charge' ||
+      phase === 'dock';
+
+      const changes:
+      Partial<RoombaTransportState> = {};
+
+      if (batteryLevel !== undefined) {
+        changes.batteryLevel =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              batteryLevel,
+            ),
+          ),
+        );
+      }
+
+      changes.isCleaning =
+      isCleaning;
+
+      changes.isCharging =
+      isCharging;
+
+      changes.isDocked =
+      isDocked;
+
+      this.updateState(
+        changes,
+      );
 
       this.log.info(
-        `Roomba V4 MQTT payload: ${message.payload}`,
+        'Roomba state updated:',
+        `battery=${this.state.batteryLevel}%`,
+        `cleaning=${this.state.isCleaning}`,
+        `charging=${this.state.isCharging}`,
+        `docked=${this.state.isDocked}`,
+        `phase=${phase ?? 'unknown'}`,
+        `cycle=${cycle ?? 'unknown'}`,
       );
+
+      return;
+    }
+
+    /**
+   * rw-constatus
+   */
+    if (
+      message.topic.includes(
+        '/shadow/name/rw-constatus/',
+      )
+    ) {
+
+      const connected =
+      this.getBoolean(
+        reported.connected,
+      );
+
+      if (connected !== undefined) {
+
+        this.log.debug(
+          `Roomba cloud connection state: connected=${connected}`,
+        );
+      }
+    }
+  }
+  private updateState(
+    changes: Partial<RoombaTransportState>,
+  ): void {
+
+    this.state = {
+      ...this.state,
+      ...changes,
+    };
+
+    const snapshot =
+    this.getState();
+
+    for (const listener of this.listeners) {
+      listener(snapshot);
     }
   }
 
-  /**
-   * Command publishing deliberately remains disabled.
-   *
-   * First we prove stable inbound state from the
-   * physical Roomba before allowing HomeKit to move it.
-   */
+  private getObject(
+    value: unknown,
+  ): Record<string, unknown> | undefined {
+
+    if (
+      typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value)
+    ) {
+      return value as Record<string, unknown>;
+    }
+
+    return undefined;
+  }
+
+  private getString(
+    value: unknown,
+  ): string | undefined {
+
+    if (
+      typeof value === 'string' &&
+    value.length > 0
+    ) {
+      return value;
+    }
+
+    return undefined;
+  }
+
+  private getNumber(
+    value: unknown,
+  ): number | undefined {
+
+    if (
+      typeof value === 'number' &&
+    Number.isFinite(value)
+    ) {
+      return value;
+    }
+
+    return undefined;
+  }
+
+  private getBoolean(
+    value: unknown,
+  ): boolean | undefined {
+
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    return undefined;
+  }
   private async sendCommand(
     command: string,
   ): Promise<void> {
