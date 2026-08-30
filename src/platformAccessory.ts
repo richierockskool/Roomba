@@ -23,6 +23,7 @@ export class RoombaAccessory {
     new Map<string, Service>();
   private readonly dockService: Service;
   private readonly batteryService: Service;
+  private lastCleaningState = false;
 
   constructor(
     private readonly platform: RoombaPlatform,
@@ -319,6 +320,33 @@ export class RoombaAccessory {
       this.platform.Characteristic.On,
       state.isCleaning,
     );
+    /**
+ * When a cleaning mission finishes, reset all
+ * mapped-room switches back to OFF.
+ *
+ * This only fires on a real cleaning -> idle transition,
+ * so the selected room remains ON while the mission runs.
+ */
+    if (
+      this.lastCleaningState &&
+  !state.isCleaning
+    ) {
+
+      for (const service of this.roomServices.values()) {
+
+        service.updateCharacteristic(
+          this.platform.Characteristic.On,
+          false,
+        );
+      }
+
+      this.platform.log.info(
+        'Roomba room cleaning completed; room switches reset to OFF.',
+      );
+    }
+
+    this.lastCleaningState =
+  state.isCleaning;
 
     this.batteryService.updateCharacteristic(
       this.platform.Characteristic.BatteryLevel,
