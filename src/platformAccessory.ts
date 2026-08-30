@@ -24,6 +24,7 @@ export class RoombaAccessory {
   private readonly dockService: Service;
   private readonly batteryService: Service;
   private lastCleaningState = false;
+  private activeRoomId?: string;
 
   constructor(
     private readonly platform: RoombaPlatform,
@@ -288,6 +289,13 @@ export class RoombaAccessory {
   /**
  * Generic mapped-room switch handler.
  */
+  /**
+ * Generic mapped-room switch handler.
+ *
+ * HomeKit can occasionally deliver duplicate SET events.
+ * activeRoomId makes room commands idempotent so one tap
+ * results in only one robot command.
+ */
   private async setRoomCleaning(
     roomId: string,
     roomName: string,
@@ -303,14 +311,60 @@ export class RoombaAccessory {
 
     if (requestedOn) {
 
-      await this.controller.startRoomCleaning(
-        roomId,
+      /**
+     * Ignore duplicate ON events for the room
+     * we already started.
+     */
+      if (this.activeRoomId === roomId) {
+
+        this.platform.log.debug(
+          `Ignoring duplicate HomeKit room ON: ${roomName} [${roomId}]`,
+        );
+
+        return;
+      }
+
+      /**
+     * Record this BEFORE awaiting the MQTT command.
+     * That blocks duplicate async SET callbacks immediately.
+     */
+      this.activeRoomId =
+      roomId;
+
+      try {
+
+        await this.controller.startRoomCleaning(
+          roomId,
+        );
+
+      } catch (error) {
+
+        this.activeRoomId =
+        undefined;
+
+        throw error;
+      }
+
+      return;
+    }
+
+    /**
+   * Ignore duplicate OFF events and OFF updates
+   * generated when we synchronize HomeKit state.
+   */
+    if (this.activeRoomId !== roomId) {
+
+      this.platform.log.debug(
+        `Ignoring duplicate HomeKit room OFF: ${roomName} [${roomId}]`,
       );
 
-    } else {
-
-      await this.controller.stopCleaning();
+      return;
     }
+
+    this.activeRoomId =
+    undefined;
+
+    await this.controller.stopCleaning();
   }
   private handleStateUpdate(
     state: RoombaState,
@@ -329,8 +383,17 @@ export class RoombaAccessory {
  */
     if (
       this.lastCleaningState &&
-  !state.isCleaning
+  !state.isCleaning &&
+  this.activeRoomId !== undefined
     ) {
+
+      /**
+   * Clear this BEFORE updating HomeKit.
+   * If HomeKit sends an OFF callback in response,
+   * setRoomCleaning() will safely ignore it.
+   */
+      this.activeRoomId =
+    undefined;
 
       for (const service of this.roomServices.values()) {
 
